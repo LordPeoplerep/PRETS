@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PRETS Terminal Tool</title>
+<style>
+  body {
+    font-family: 'Consolas', monospace, monospace;
+    background-color: #121212;
+    color: #c0c0c0;
+    padding: 20px;
+    max-width: 800px;
+    margin: auto;
+  }
+  h1 {
+    color: #80c0ff;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+  label {
+    font-weight: bold;
+    display: block;
+    margin-top: 1rem;
+  }
+  textarea, input[type="text"] {
+    width: 100%;
+    background-color: #222;
+    border: none;
+    color: #c0c0c0;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 1rem;
+    border-radius: 5px;
+    resize: vertical;
+  }
+  button {
+    margin-top: 0.8rem;
+    padding: 10px 20px;
+    background-color: #80c0ff;
+    border: none;
+    border-radius: 5px;
+    color: #121212;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #5a90d6;
+  }
+  pre.output {
+    background-color: #1a1a1a;
+    padding: 15px;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    user-select: all;
+  }
+  .section {
+    margin-bottom: 3rem;
+  }
+  .label-small {
+    font-size: 0.9rem;
+    color: #999;
+    margin-bottom: 0.3rem;
+  }
+  .copy-btn {
+    margin-left: 10px;
+    font-size: 0.8rem;
+    padding: 5px 12px;
+  }
+</style>
+</head>
+<body>
+
+<h1>PRETS Terminal Tool</h1>
+
+<div class="section" id="hash-section">
+  <label for="input-text">Enter text to hash:</label>
+  <textarea id="input-text" rows="4" placeholder="Type or paste your input here..."></textarea>
+  <button id="generate-hash">Generate 2048-bit Hash</button>
+  <div class="label-small">Encryption Bit Length: 2048 bits</div>
+  <pre class="output" id="hash-output"></pre>
+  <button class="copy-btn" id="copy-hash">Copy Hash</button>
+</div>
+
+<div class="section" id="terminal-section">
+  <label>Generate PRETS Terminal Number:</label>
+  <button id="generate-terminal">Generate Terminal Number</button>
+  <pre class="output" id="terminal-output"></pre>
+  <button class="copy-btn" id="copy-terminal">Copy Terminal Number</button>
+</div>
+
+<script>
+// Utility: Convert ArrayBuffer to hex string
+function bufferToHex(buffer) {
+  return [...new Uint8Array(buffer)]
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Async function to hash data with SHA-256
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  return hashBuffer;
+}
+
+// Hash chaining 8 times
+async function chainedHash(input) {
+  let data = input;
+  for (let i = 0; i < 8; i++) {
+    const hashBuffer = await sha256(data);
+    data = bufferToHex(hashBuffer);
+  }
+  return data; // hex string of 64 chars (256 bits)
+}
+
+// Repeat to build 2048 bits (256 bytes, 512 hex chars)
+function build2048BitHash(chainHashHex) {
+  // chainHashHex length = 64 hex chars (32 bytes)
+  // repeat 8 times → 64 * 8 = 512 hex chars = 2048 bits
+  return chainHashHex.repeat(8);
+}
+
+// Format hash output: 2 lines, 256 hex chars per line
+function formatHashOutput(hash512) {
+  const lineLength = 256;
+  const line1 = hash512.slice(0, lineLength);
+  const line2 = hash512.slice(lineLength, lineLength * 2);
+  return line1 + '\n' + line2;
+}
+
+// Generate PRETS Terminal Number like PRT-264.524.883
+function generateTerminalNumber() {
+  const randomPart = () => Math.floor(Math.random() * 900 + 100); // 100-999
+  return `PRT-${randomPart()}.${randomPart()}.${randomPart()}`;
+}
+
+// Copy to clipboard helper
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Copied to clipboard!');
+  }, () => {
+    alert('Copy failed. Try manually.');
+  });
+}
+
+// DOM Elements
+const inputText = document.getElementById('input-text');
+const generateHashBtn = document.getElementById('generate-hash');
+const hashOutput = document.getElementById('hash-output');
+const copyHashBtn = document.getElementById('copy-hash');
+
+const generateTerminalBtn = document.getElementById('generate-terminal');
+const terminalOutput = document.getElementById('terminal-output');
+const copyTerminalBtn = document.getElementById('copy-terminal');
+
+// Generate Hash Button Click
+generateHashBtn.addEventListener('click', async () => {
+  const input = inputText.value.trim();
+  if (!input) {
+    alert('Please enter input text to hash.');
+    return;
+  }
+  hashOutput.textContent = 'Hashing... please wait.';
+  try {
+    const chainHash = await chainedHash(input);
+    const fullHash = build2048BitHash(chainHash);
+    const formatted = formatHashOutput(fullHash);
+    hashOutput.textContent = formatted;
+  } catch (e) {
+    hashOutput.textContent = 'Error generating hash.';
+    console.error(e);
+  }
+});
+
+// Copy Hash Button Click
+copyHashBtn.addEventListener('click', () => {
+  if (hashOutput.textContent) {
+    copyToClipboard(hashOutput.textContent);
+  } else {
+    alert('No hash to copy.');
+  }
+});
+
+// Generate Terminal Number Button Click
+generateTerminalBtn.addEventListener('click', () => {
+  const terminalNum = generateTerminalNumber();
+  terminalOutput.textContent = terminalNum;
+});
+
+// Copy Terminal Number Button Click
+copyTerminalBtn.addEventListener('click', () => {
+  if (terminalOutput.textContent) {
+    copyToClipboard(terminalOutput.textContent);
+  } else {
+    alert('No terminal number to copy.');
+  }
+});
+</script>
+
+</body>
+</html>
